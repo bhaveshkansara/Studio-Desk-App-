@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Studio {
+  id        String   @id @default(uuid())
+  name      String   @default("My Studio")
+  phone     String?  @db.VarChar(20)
+  createdAt DateTime @default(now())
+
+  members  StudioMember[]
+  bookings Booking[]
+  students Student[]
+  leads    Lead[]
+  payments Payment[]
+  templates MessageTemplate[]
+
+  @@map("studios")
+}
+
+model StudioMember {
+  studioId String
+  userId   String
+  role     String @default("owner") // 'owner' or 'staff'
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  @@id([studioId, userId])
+  @@index([userId])
+  @@map("studio_members")
+}
+
+model Booking {
+  id                String    @id @default(uuid())
+  studioId          String
+  client            String
+  phone             String?   @db.VarChar(20)
+  insta             String?   @db.VarChar(100)
+  source            String?   @db.VarChar(50) // whatsapp, instagram, call, website, referral
+  kind              String    @default("bride") // bride, engagement, party, event
+  status            String    @default("enquiry") // enquiry, confirmed, done, cancelled
+  service           String?
+  eventDate         DateTime? @db.Date
+  eventTime         DateTime? @db.Time
+  trialDate         DateTime? @db.Date
+  venue             String?
+  total             Decimal   @default(0) @db.Decimal(12, 2)
+  paid              Decimal   @default(0) @db.Decimal(12, 2)
+  confirmationSent  Boolean   @default(false)
+  notes             String?   @db.LongText
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  studio   Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([studioId, eventDate])
+  @@map("bookings")
+}
+
+model Student {
+  id        String    @id @default(uuid())
+  studioId  String
+  name      String
+  phone     String?   @db.VarChar(20)
+  insta     String?   @db.VarChar(100)
+  source    String?   @db.VarChar(50) // whatsapp, instagram, call, website, referral
+  course    String    @default("Basic")
+  status    String    @default("active") // active, completed, left
+  batch     String?
+  startDate DateTime? @db.Date
+  fee       Decimal   @default(0) @db.Decimal(12, 2)
+  paid      Decimal   @default(0) @db.Decimal(12, 2)
+  notes     String?   @db.LongText
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  studio   Studio    @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  payments Payment[]
+
+  @@index([studioId])
+  @@map("students")
+}
+
+model Lead {
+  id        String    @id @default(uuid())
+  studioId  String
+  name      String?
+  phone     String?   @db.VarChar(20)
+  insta     String?   @db.VarChar(100)
+  source    String?   @db.VarChar(50) // whatsapp, instagram, call, website, referral
+  kind      String    @default("bride") // bride, engagement, party, event, student
+  service   String?
+  eventDate DateTime? @db.Date
+  eventTime DateTime? @db.Time
+  venue     String?
+  summary   String?   @db.VarChar(255)
+  message   String?   @db.LongText
+  status    String    @default("new") // new, converted, dismissed
+  createdAt DateTime  @default(now())
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  @@index([studioId, status])
+  @@map("leads")
+}
+
+model Payment {
+  id        String    @id @default(uuid())
+  studioId  String
+  bookingId String?
+  studentId String?
+  amount    Decimal   @db.Decimal(12, 2)
+  note      String?   @db.VarChar(255)
+  paidOn    DateTime  @default(now()) @db.Date
+  createdAt DateTime  @default(now())
+
+  studio  Studio   @relation(fields: [studioId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([studentId])
+  @@map("payments")
+}
+
+model MessageTemplate {
+  studioId String
+  key      String
+  body     String @db.LongText
+
+  studio Studio @relation(fields: [studioId], references: [id], onDelete: Cascade)
+
+  @@id([studioId, key])
+  @@map("message_templates")
+}
