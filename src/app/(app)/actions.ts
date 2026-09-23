@@ -407,8 +407,6 @@ export async function deleteTeamStaff(fd: FormData) {
 // ------------------------------------------------------------------ quotations
 export async function sendQuotation(fd: FormData) {
   const { supabase, studio } = await requireStudio();
-
-  // Get form values
   const client = str(fd, "client");
   const phone = str(fd, "phone");
   const service = str(fd, "service");
@@ -416,138 +414,87 @@ export async function sendQuotation(fd: FormData) {
   const event_date = str(fd, "event_date");
   const venue = str(fd, "venue");
 
-  // Validate required fields
   if (!client || !phone || !service || !amount) {
-    console.log("❌ Quotation validation failed:", { client, phone, service, amount });
     redirect("/quotations?error=Please%20fill%20all%20required%20fields");
   }
 
-  console.log("✅ Quotation validation passed for:", client);
-
+  let config: any = null;
   try {
-    // Try to get WhatsApp config
-    let config: any = null;
-    try {
-      console.log("🔍 Fetching WhatsApp config for studio:", studio.id);
-      const { data, error } = await supabase
-        .from("whatsapp_config")
-        .select("*")
-        .eq("studio_id", studio.id)
-        .maybeSingle();
+    const { data } = await supabase
+      .from("whatsapp_config")
+      .select("*")
+      .eq("studio_id", studio.id)
+      .maybeSingle();
+    config = data;
+  } catch (e) {
+    // Config table may not exist
+  }
 
-      if (error) {
-        console.log("⚠️ WhatsApp config query error:", error);
-      }
+  const advance = Math.round(amount * 0.3);
+  const balance = amount - advance;
+  const messageText = `Hi ${client},
 
-      config = data;
-      console.log("✅ WhatsApp config found:", !!config, config ? "configured" : "not configured");
-    } catch (e) {
-      console.log("❌ Exception fetching config:", e);
-    }
+Thank you for enquiring!
 
-    // Build quotation message
-    const advance = Math.round(amount * 0.3);
-    const balance = amount - advance;
-
-    const messageText = `Hi ${client},
-
-Thank you for enquiring! 🎉
-
-*SERVICE QUOTATION*
+SERVICE QUOTATION
 
 Service: ${service}
 ${event_date ? `Date: ${event_date}` : ""}
 ${venue ? `Venue: ${venue}` : ""}
 
-*QUOTATION: ₹${amount}*
+QUOTATION: ₹${amount}
 
-💳 Advance (30%): ₹${advance}
-💳 Balance Due: ₹${balance}
+Advance (30%): ₹${advance}
+Balance Due: ₹${balance}
 
-Ready to confirm? Please reply. 💬`;
+Ready to confirm? Please reply.`;
 
-    // Try to send via WhatsApp if configured
-    let sentViaWhatsapp = false;
-    let waError: string | null = null;
+  let sentViaWhatsapp = false;
 
-    if (config?.is_configured && config?.api_token && config?.phone_number_id) {
-      console.log("📱 Attempting WhatsApp send...");
-      try {
-        // Clean and format phone number
-        let formattedPhone = phone.replace(/\D/g, "").trim();
-        console.log("📞 Original phone:", phone, "-> cleaned:", formattedPhone);
-
-        if (!formattedPhone) throw new Error("Invalid phone number");
-
-        if (formattedPhone.startsWith("0")) {
-          formattedPhone = formattedPhone.substring(1);
-        }
-        if (formattedPhone.length === 10) {
-          formattedPhone = "91" + formattedPhone;
-        } else if (!formattedPhone.startsWith("91")) {
-          formattedPhone = "91" + formattedPhone;
-        }
-
-        console.log("📞 Final formatted phone:", formattedPhone);
-
-        // Send via WhatsApp
-        const response = await fetch(
-          `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${config.api_token}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              messaging_product: "whatsapp",
-              to: formattedPhone,
-              type: "text",
-              text: { body: messageText },
-            }),
-          }
-        );
-
-        console.log("📨 WhatsApp API response:", response.status);
-
-        if (response.ok) {
-          sentViaWhatsapp = true;
-          console.log("✅ WhatsApp sent successfully!");
-        } else {
-          const text = await response.text();
-          console.log("❌ WhatsApp API error:", response.status, text);
-          waError = `API ${response.status}`;
-        }
-      } catch (error) {
-        console.log("❌ Exception during WhatsApp send:", error);
-        waError = error instanceof Error ? error.message : "Unknown error";
+  if (config?.is_configured && config?.api_token && config?.phone_number_id) {
+    try {
+      let formattedPhone = phone.replace(/\D/g, "").trim();
+      if (formattedPhone.startsWith("0")) {
+        formattedPhone = formattedPhone.substring(1);
       }
-    } else {
-      console.log("⏭️ WhatsApp not configured or incomplete:", {
-        is_configured: config?.is_configured,
-        has_token: !!config?.api_token,
-        has_phone_id: !!config?.phone_number_id,
-      });
-    }
+      if (formattedPhone.length === 10) {
+        formattedPhone = "91" + formattedPhone;
+      } else if (!formattedPhone.startsWith("91")) {
+        formattedPhone = "91" + formattedPhone;
+      }
 
-    // Redirect with appropriate message
-    if (sentViaWhatsapp) {
-      console.log("✅ Final: Quotation sent successfully via WhatsApp");
-      redirect("/quotations?success=✅%20Quotation%20sent%20via%20WhatsApp!");
-    } else if (config?.is_configured) {
-      console.log("⚠️ Final: Quotation created but WhatsApp send failed:", waError);
-      const errorMsg = waError ? `%20(${encodeURIComponent(waError)})` : "";
-      redirect(`/quotations?success=Quotation%20created%20but%20WhatsApp%20failed${errorMsg}`);
-    } else {
-      console.log("ℹ️ Final: WhatsApp not configured");
-      redirect("/quotations?success=Quotation%20created!%20👉%20Set%20up%20WhatsApp%20in%20Settings%20to%20send.");
-    }
-  } catch (error) {
-    // Don't catch Next.js redirect errors
-    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+      const response = await fetch(
+        `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.api_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: formattedPhone,
+            type: "text",
+            text: { body: messageText },
+          }),
+        }
+      );
 
-    const message = error instanceof Error ? error.message : "Unknown error";
-    redirect(`/quotations?error=Error:%20${encodeURIComponent(message)}`);
+      if (response.ok) {
+        sentViaWhatsapp = true;
+      }
+    } catch (error) {
+      // WhatsApp send failed, continue anyway
+    }
+  }
+
+  // Redirect OUTSIDE try-catch to avoid catching NEXT_REDIRECT
+  if (sentViaWhatsapp) {
+    redirect("/quotations?success=Quotation%20sent%20via%20WhatsApp!");
+  } else if (config?.is_configured) {
+    redirect("/quotations?success=Quotation%20created%20but%20WhatsApp%20send%20failed");
+  } else {
+    redirect("/quotations?success=Quotation%20created!%20Set%20up%20WhatsApp%20in%20Settings%20to%20send.");
   }
 }
 

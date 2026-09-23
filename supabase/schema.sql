@@ -396,3 +396,8 @@ create index analytics_events_studio_date_idx on public.analytics_events(studio_
 alter table public.analytics_events enable row level security;
 create policy analytics_events_all on public.analytics_events for all
   using (public.is_member(studio_id)) with check (public.is_member(studio_id));
+
+-- ---------------------------------------------------------------- MUA Marketing AI
+-- Saved marketing campaigns and the private "marketing-images" storage bucket.
+-- The full, re-runnable definition lives in supabase/migrations/marketing_ai.sql:
+-- run that file after this one (or on its own for an existing project).
