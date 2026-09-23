@@ -10,7 +10,7 @@ export default async function QuotationsPage({
   searchParams: Promise<{ lead?: string; booking?: string; success?: string; error?: string }>;
 }) {
   const sp = await searchParams;
-  const { lead: leadId, booking: bookingId, success, error } = await sp;
+  const { lead: leadId, booking: bookingId, success, error } = sp;
   const { supabase, studio } = await requireStudio();
 
   let prefill: Partial<Booking> | null = null;
