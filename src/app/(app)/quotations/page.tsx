@@ -7,10 +7,10 @@ import type { Booking } from "@/lib/types";
 export default async function QuotationsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ lead?: string; booking?: string }>;
+  searchParams: Promise<{ lead?: string; booking?: string; success?: string; error?: string }>;
 }) {
   const sp = await searchParams;
-  const { lead: leadId, booking: bookingId } = await sp;
+  const { lead: leadId, booking: bookingId, success, error } = await sp;
   const { supabase, studio } = await requireStudio();
 
   let prefill: Partial<Booking> | null = null;
@@ -53,6 +53,9 @@ export default async function QuotationsPage({
         <h2>Quotations</h2>
         <p className="hint">Create and send quotations to enquiries via WhatsApp</p>
       </div>
+
+      {success ? <div className="banner info" style={{ marginTop: 0 }}>{success}</div> : null}
+      {error ? <div className="banner bad" style={{ marginTop: 0 }}>{error}</div> : null}
 
       <section>
         <div className="sec-head" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

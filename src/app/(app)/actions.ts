@@ -455,7 +455,7 @@ export async function sendQuotation(fd: FormData) {
   const venue = str(fd, "venue");
 
   if (!client || !phone || !service || !amount) {
-    redirect(to("/quotations", { error: "Fill all required fields (client, phone, service, amount)" }));
+    redirect("/quotations?error=Fill%20all%20required%20fields");
   }
 
   try {
@@ -495,57 +495,52 @@ Dior • Armani • Gucci • Pat McGrath • Estée Lauder
 
 Ready to confirm? Please reply with confirmation. 💬`;
 
+    let waSuccess = false;
+
     // If WhatsApp is configured, send via WhatsApp
     if (config?.is_configured && config?.api_token && config?.phone_number_id) {
-      // Format phone number
-      let formattedPhone = phone.replace(/\D/g, "");
-      if (formattedPhone.startsWith("0")) formattedPhone = formattedPhone.slice(1);
-      if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-      if (!formattedPhone.startsWith("91")) formattedPhone = "91" + formattedPhone;
+      try {
+        // Format phone number
+        let formattedPhone = phone.replace(/\D/g, "");
+        if (formattedPhone.startsWith("0")) formattedPhone = formattedPhone.slice(1);
+        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+        if (!formattedPhone.startsWith("91")) formattedPhone = "91" + formattedPhone;
 
-      const waResponse = await fetch(
-        `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${config.api_token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            messaging_product: "whatsapp",
-            to: formattedPhone,
-            type: "text",
-            text: { body: messageText },
-          }),
-        }
-      );
-
-      const waData = (await waResponse.json()) as any;
-
-      if (!waResponse.ok) {
-        // WhatsApp send failed, but still show success with note
-        redirect(
-          to("/quotations", {
-            warning: `Quotation created but WhatsApp send failed: ${waData?.error?.message || "Unknown error"}`,
-          })
+        const waResponse = await fetch(
+          `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${config.api_token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              messaging_product: "whatsapp",
+              to: formattedPhone,
+              type: "text",
+              text: { body: messageText },
+            }),
+          }
         );
-      }
 
-      redirect("/quotations?saved=1&sent=quotation&method=whatsapp");
+        if (waResponse.ok) {
+          waSuccess = true;
+        }
+      } catch (waError) {
+        // WhatsApp send failed, but continue anyway
+      }
+    }
+
+    // Always redirect to success
+    if (waSuccess) {
+      redirect("/quotations?success=Quotation%20sent%20via%20WhatsApp");
+    } else if (config?.is_configured) {
+      redirect("/quotations?success=Quotation%20created%20(WhatsApp%20send%20failed)");
     } else {
-      // WhatsApp not configured - show friendly message
-      redirect(
-        to("/quotations", {
-          info: `Quotation ready! Set up WhatsApp in Settings to send automatically.`,
-        })
-      );
+      redirect("/quotations?success=Quotation%20created%20-%20Set%20up%20WhatsApp%20in%20Settings%20to%20send");
     }
   } catch (error) {
-    redirect(
-      to("/quotations", {
-        error: `Error: ${error instanceof Error ? error.message : "Failed to process quotation"}`,
-      })
-    );
+    redirect("/quotations?error=Failed%20to%20create%20quotation");
   }
 }
 
