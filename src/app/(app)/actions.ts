@@ -455,22 +455,17 @@ export async function sendQuotation(fd: FormData) {
   const venue = str(fd, "venue");
 
   if (!client || !phone || !service || !amount) {
-    redirect(to("/quotations", { error: "Fill all required fields" }));
+    redirect(to("/quotations", { error: "Fill all required fields (client, phone, service, amount)" }));
   }
 
-  // Get WhatsApp config
-  const { data: config } = await supabase
-    .from("whatsapp_config")
-    .select("*")
-    .eq("studio_id", studio.id)
-    .maybeSingle();
-
-  if (!config || !config.is_configured || !config.api_token || !config.phone_number_id) {
-    redirect(to("/quotations", { error: "WhatsApp is not configured. Set it up in Settings > WhatsApp Integration" }));
-  }
-
-  // Send WhatsApp message
   try {
+    // Get WhatsApp config
+    const { data: config } = await supabase
+      .from("whatsapp_config")
+      .select("*")
+      .eq("studio_id", studio.id)
+      .maybeSingle();
+
     const advance = Math.round(amount * 0.3);
     const balance = amount - advance;
 
@@ -500,44 +495,55 @@ Dior • Armani • Gucci • Pat McGrath • Estée Lauder
 
 Ready to confirm? Please reply with confirmation. 💬`;
 
-    // Format phone number
-    let formattedPhone = phone.replace(/\D/g, "");
-    if (formattedPhone.startsWith("0")) formattedPhone = formattedPhone.slice(1);
-    if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-    if (!formattedPhone.startsWith("91")) formattedPhone = "91" + formattedPhone;
+    // If WhatsApp is configured, send via WhatsApp
+    if (config?.is_configured && config?.api_token && config?.phone_number_id) {
+      // Format phone number
+      let formattedPhone = phone.replace(/\D/g, "");
+      if (formattedPhone.startsWith("0")) formattedPhone = formattedPhone.slice(1);
+      if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
+      if (!formattedPhone.startsWith("91")) formattedPhone = "91" + formattedPhone;
 
-    const waResponse = await fetch(
-      `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${config.api_token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messaging_product: "whatsapp",
-          to: formattedPhone,
-          type: "text",
-          text: { body: messageText },
-        }),
+      const waResponse = await fetch(
+        `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${config.api_token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to: formattedPhone,
+            type: "text",
+            text: { body: messageText },
+          }),
+        }
+      );
+
+      const waData = (await waResponse.json()) as any;
+
+      if (!waResponse.ok) {
+        // WhatsApp send failed, but still show success with note
+        redirect(
+          to("/quotations", {
+            warning: `Quotation created but WhatsApp send failed: ${waData?.error?.message || "Unknown error"}`,
+          })
+        );
       }
-    );
 
-    const waData = (await waResponse.json()) as any;
-
-    if (!waResponse.ok) {
+      redirect("/quotations?saved=1&sent=quotation&method=whatsapp");
+    } else {
+      // WhatsApp not configured - show friendly message
       redirect(
         to("/quotations", {
-          error: `WhatsApp error: ${waData?.error?.message || "Failed to send"}`,
+          info: `Quotation ready! Set up WhatsApp in Settings to send automatically.`,
         })
       );
     }
-
-    redirect("/quotations?saved=1&sent=quotation");
   } catch (error) {
     redirect(
       to("/quotations", {
-        error: `Failed to send: ${error instanceof Error ? error.message : "Unknown error"}`,
+        error: `Error: ${error instanceof Error ? error.message : "Failed to process quotation"}`,
       })
     );
   }
