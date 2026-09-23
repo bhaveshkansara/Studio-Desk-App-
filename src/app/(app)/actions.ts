@@ -447,6 +447,8 @@ export async function generateQuotationDraft(fd: FormData) {
 
 export async function sendQuotation(fd: FormData) {
   const { supabase, studio } = await requireStudio();
+
+  // Get form values
   const client = str(fd, "client");
   const phone = str(fd, "phone");
   const service = str(fd, "service");
@@ -454,18 +456,26 @@ export async function sendQuotation(fd: FormData) {
   const event_date = str(fd, "event_date");
   const venue = str(fd, "venue");
 
+  // Validate required fields
   if (!client || !phone || !service || !amount) {
-    redirect("/quotations?error=Fill%20all%20required%20fields");
+    redirect("/quotations?error=Please%20fill%20all%20required%20fields");
   }
 
   try {
-    // Get WhatsApp config
-    const { data: config } = await supabase
-      .from("whatsapp_config")
-      .select("*")
-      .eq("studio_id", studio.id)
-      .maybeSingle();
+    // Try to get WhatsApp config
+    let config: any = null;
+    try {
+      const { data } = await supabase
+        .from("whatsapp_config")
+        .select("*")
+        .eq("studio_id", studio.id)
+        .maybeSingle();
+      config = data;
+    } catch (e) {
+      // Table might not exist yet, continue anyway
+    }
 
+    // Build quotation message
     const advance = Math.round(amount * 0.3);
     const balance = amount - advance;
 
@@ -484,29 +494,28 @@ ${venue ? `Venue: ${venue}` : ""}
 💳 Advance (30%): ₹${advance}
 💳 Balance Due: ₹${balance}
 
-*INCLUSIONS:*
-✓ Professional Hairstyling
-✓ Hair Extensions
-✓ Makeup Artistry
-✓ Bridal Touch-ups
+Ready to confirm? Please reply. 💬`;
 
-*PROFESSIONAL PRODUCTS:*
-Dior • Armani • Gucci • Pat McGrath • Estée Lauder
+    // Try to send via WhatsApp if configured
+    let sentViaWhatsapp = false;
 
-Ready to confirm? Please reply with confirmation. 💬`;
-
-    let waSuccess = false;
-
-    // If WhatsApp is configured, send via WhatsApp
     if (config?.is_configured && config?.api_token && config?.phone_number_id) {
       try {
-        // Format phone number
-        let formattedPhone = phone.replace(/\D/g, "");
-        if (formattedPhone.startsWith("0")) formattedPhone = formattedPhone.slice(1);
-        if (formattedPhone.length === 10) formattedPhone = "91" + formattedPhone;
-        if (!formattedPhone.startsWith("91")) formattedPhone = "91" + formattedPhone;
+        // Clean and format phone number
+        let formattedPhone = phone.replace(/\D/g, "").trim();
+        if (!formattedPhone) throw new Error("Invalid phone number");
 
-        const waResponse = await fetch(
+        if (formattedPhone.startsWith("0")) {
+          formattedPhone = formattedPhone.substring(1);
+        }
+        if (formattedPhone.length === 10) {
+          formattedPhone = "91" + formattedPhone;
+        } else if (!formattedPhone.startsWith("91")) {
+          formattedPhone = "91" + formattedPhone;
+        }
+
+        // Send via WhatsApp
+        const response = await fetch(
           `https://graph.instagram.com/v18.0/${config.phone_number_id}/messages`,
           {
             method: "POST",
@@ -523,24 +532,25 @@ Ready to confirm? Please reply with confirmation. 💬`;
           }
         );
 
-        if (waResponse.ok) {
-          waSuccess = true;
+        if (response.ok) {
+          sentViaWhatsapp = true;
         }
-      } catch (waError) {
-        // WhatsApp send failed, but continue anyway
+      } catch (error) {
+        // WhatsApp send failed, but don't fail the whole operation
       }
     }
 
-    // Always redirect to success
-    if (waSuccess) {
-      redirect("/quotations?success=Quotation%20sent%20via%20WhatsApp");
+    // Redirect with appropriate message
+    if (sentViaWhatsapp) {
+      redirect("/quotations?success=Quotation%20sent%20via%20WhatsApp%20successfully!");
     } else if (config?.is_configured) {
-      redirect("/quotations?success=Quotation%20created%20(WhatsApp%20send%20failed)");
+      redirect("/quotations?success=Quotation%20created%20but%20WhatsApp%20send%20failed.%20Please%20try%20again.");
     } else {
-      redirect("/quotations?success=Quotation%20created%20-%20Set%20up%20WhatsApp%20in%20Settings%20to%20send");
+      redirect("/quotations?success=Quotation%20created!%20Set%20up%20WhatsApp%20in%20Settings%20to%20send%20automatically.");
     }
   } catch (error) {
-    redirect("/quotations?error=Failed%20to%20create%20quotation");
+    const message = error instanceof Error ? error.message : "Unknown error";
+    redirect(`/quotations?error=Error:%20${encodeURIComponent(message)}`);
   }
 }
 
