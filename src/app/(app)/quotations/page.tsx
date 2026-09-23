@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { generateQuotationDraft, sendQuotation } from "@/app/(app)/actions";
+import { sendQuotation } from "@/app/(app)/actions";
 import { requireStudio } from "@/lib/auth";
 import { fmtDate, inr } from "@/lib/format";
 import type { Booking } from "@/lib/types";
@@ -71,7 +71,7 @@ export default async function QuotationsPage({
             📋 Templates
           </Link>
         </div>
-        <form action={generateQuotationDraft} className="form panel">
+        <form action={sendQuotation} className="form panel">
           <div className="grid">
             <div className="fld">
               <label htmlFor="client">Client name</label>
@@ -103,23 +103,14 @@ export default async function QuotationsPage({
             </div>
           </div>
 
-          <div style={{ padding: "12px 0", borderTop: "1px solid var(--line)", marginTop: "12px" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer" }}>
-              <input type="checkbox" name="send_whatsapp" defaultChecked={true} />
-              <span>
-                <strong>Send via WhatsApp</strong>
-                <p style={{ margin: "4px 0 0 0", fontSize: "0.9em", color: "var(--hint)" }}>
-                  ✓ Send now  •  ✗ Save as draft (send later)
-                </p>
-              </span>
-            </label>
-          </div>
-
           <div className="form-actions">
             <button className="btn primary" type="submit">
-              Generate Quotation
+              Generate & Send via WhatsApp
             </button>
           </div>
+          <p style={{ fontSize: "0.9em", color: "var(--hint)", marginTop: "12px", textAlign: "center" }}>
+            Note: Set up WhatsApp in Settings for automatic sending
+          </p>
         </form>
       </section>
 
