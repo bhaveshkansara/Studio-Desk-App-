@@ -543,6 +543,9 @@ Ready to confirm? Please reply. 💬`;
       redirect("/quotations?success=Quotation%20created!%20👉%20Set%20up%20WhatsApp%20in%20Settings%20to%20send.");
     }
   } catch (error) {
+    // Don't catch Next.js redirect errors
+    if (error instanceof Error && error.message === "NEXT_REDIRECT") throw error;
+
     const message = error instanceof Error ? error.message : "Unknown error";
     redirect(`/quotations?error=Error:%20${encodeURIComponent(message)}`);
   }
