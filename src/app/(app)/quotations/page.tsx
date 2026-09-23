@@ -45,17 +45,7 @@ export default async function QuotationsPage({
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const { data: drafts } = await supabase
-    .from("quotation_drafts")
-    .select("*, leads(name, phone), bookings(client, phone)")
-    .eq("studio_id", studio.id)
-    .eq("status", "draft")
-    .eq("sent_via_whatsapp", false)
-    .order("created_at", { ascending: false })
-    .limit(20);
-
   const enquiries = (bookings ?? []) as Booking[];
-  const pendingDrafts = drafts ?? [];
 
   return (
     <>
@@ -114,47 +104,6 @@ export default async function QuotationsPage({
         </form>
       </section>
 
-      {pendingDrafts.length > 0 ? (
-        <section>
-          <div className="sec-head">
-            <h2>📝 Saved Quotations</h2>
-            <span>{pendingDrafts.length} draft{pendingDrafts.length === 1 ? "" : "s"} ready to send</span>
-          </div>
-          <div className="panel">
-            <ul className="list">
-              {pendingDrafts.map((draft: any) => {
-                const clientName = draft.bookings?.client || draft.leads?.name || "Unknown";
-                const clientPhone = draft.bookings?.phone || draft.leads?.phone || "";
-                return (
-                  <li key={draft.id} className="row">
-                    <div className="row-main">
-                      <span className="txt">
-                        <strong>{clientName}</strong>
-                        <small>₹{inr(draft.amount)} • {clientPhone}</small>
-                      </span>
-                    </div>
-                    <div className="acts">
-                      <form
-                        action={async (fd) => {
-                          fd.append("client", clientName);
-                          fd.append("phone", clientPhone);
-                          fd.append("amount", draft.amount.toString());
-                          await sendQuotation(fd);
-                        }}
-                        style={{ display: "contents" }}
-                      >
-                        <button type="submit" className="act hot" style={{ border: "none", background: "none", cursor: "pointer", padding: "4px 12px" }}>
-                          Send now
-                        </button>
-                      </form>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </section>
-      ) : null}
 
       <section>
         <div className="sec-head">
