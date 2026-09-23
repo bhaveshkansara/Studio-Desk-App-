@@ -458,21 +458,31 @@ export async function sendQuotation(fd: FormData) {
 
   // Validate required fields
   if (!client || !phone || !service || !amount) {
+    console.log("❌ Quotation validation failed:", { client, phone, service, amount });
     redirect("/quotations?error=Please%20fill%20all%20required%20fields");
   }
+
+  console.log("✅ Quotation validation passed for:", client);
 
   try {
     // Try to get WhatsApp config
     let config: any = null;
     try {
-      const { data } = await supabase
+      console.log("🔍 Fetching WhatsApp config for studio:", studio.id);
+      const { data, error } = await supabase
         .from("whatsapp_config")
         .select("*")
         .eq("studio_id", studio.id)
         .maybeSingle();
+
+      if (error) {
+        console.log("⚠️ WhatsApp config query error:", error);
+      }
+
       config = data;
+      console.log("✅ WhatsApp config found:", !!config, config ? "configured" : "not configured");
     } catch (e) {
-      // Table might not exist yet, continue anyway
+      console.log("❌ Exception fetching config:", e);
     }
 
     // Build quotation message
@@ -498,11 +508,15 @@ Ready to confirm? Please reply. 💬`;
 
     // Try to send via WhatsApp if configured
     let sentViaWhatsapp = false;
+    let waError: string | null = null;
 
     if (config?.is_configured && config?.api_token && config?.phone_number_id) {
+      console.log("📱 Attempting WhatsApp send...");
       try {
         // Clean and format phone number
         let formattedPhone = phone.replace(/\D/g, "").trim();
+        console.log("📞 Original phone:", phone, "-> cleaned:", formattedPhone);
+
         if (!formattedPhone) throw new Error("Invalid phone number");
 
         if (formattedPhone.startsWith("0")) {
@@ -513,6 +527,8 @@ Ready to confirm? Please reply. 💬`;
         } else if (!formattedPhone.startsWith("91")) {
           formattedPhone = "91" + formattedPhone;
         }
+
+        console.log("📞 Final formatted phone:", formattedPhone);
 
         // Send via WhatsApp
         const response = await fetch(
@@ -532,21 +548,39 @@ Ready to confirm? Please reply. 💬`;
           }
         );
 
+        console.log("📨 WhatsApp API response:", response.status);
+
         if (response.ok) {
           sentViaWhatsapp = true;
+          console.log("✅ WhatsApp sent successfully!");
+        } else {
+          const text = await response.text();
+          console.log("❌ WhatsApp API error:", response.status, text);
+          waError = `API ${response.status}`;
         }
       } catch (error) {
-        // WhatsApp send failed, but don't fail the whole operation
+        console.log("❌ Exception during WhatsApp send:", error);
+        waError = error instanceof Error ? error.message : "Unknown error";
       }
+    } else {
+      console.log("⏭️ WhatsApp not configured or incomplete:", {
+        is_configured: config?.is_configured,
+        has_token: !!config?.api_token,
+        has_phone_id: !!config?.phone_number_id,
+      });
     }
 
     // Redirect with appropriate message
     if (sentViaWhatsapp) {
-      redirect("/quotations?success=Quotation%20sent%20via%20WhatsApp%20successfully!");
+      console.log("✅ Final: Quotation sent successfully via WhatsApp");
+      redirect("/quotations?success=✅%20Quotation%20sent%20via%20WhatsApp!");
     } else if (config?.is_configured) {
-      redirect("/quotations?success=Quotation%20created%20but%20WhatsApp%20send%20failed.%20Please%20try%20again.");
+      console.log("⚠️ Final: Quotation created but WhatsApp send failed:", waError);
+      const errorMsg = waError ? `%20(${encodeURIComponent(waError)})` : "";
+      redirect(`/quotations?success=Quotation%20created%20but%20WhatsApp%20failed${errorMsg}`);
     } else {
-      redirect("/quotations?success=Quotation%20created!%20Set%20up%20WhatsApp%20in%20Settings%20to%20send%20automatically.");
+      console.log("ℹ️ Final: WhatsApp not configured");
+      redirect("/quotations?success=Quotation%20created!%20👉%20Set%20up%20WhatsApp%20in%20Settings%20to%20send.");
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
