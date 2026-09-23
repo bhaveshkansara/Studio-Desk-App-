@@ -405,46 +405,6 @@ export async function deleteTeamStaff(fd: FormData) {
 }
 
 // ------------------------------------------------------------------ quotations
-export async function generateQuotationDraft(fd: FormData) {
-  const { supabase, studio } = await requireStudio();
-  const leadId = str(fd, "lead_id");
-  const bookingId = str(fd, "booking_id");
-  const amount = money(fd, "amount");
-  const autoGenerate = fd.get("auto_generate") === "on";
-  const sendViaWhatsapp = fd.get("send_whatsapp") === "on";
-
-  if (!amount) {
-    redirect("/quotations?error=" + enc("Enter quotation amount"));
-  }
-
-  // Save to quotation_drafts table for tracking
-  const { error: insertError } = await supabase
-    .from("quotation_drafts")
-    .insert({
-      studio_id: studio.id,
-      lead_id: leadId,
-      booking_id: bookingId,
-      amount,
-      auto_generated: autoGenerate,
-      sent_via_whatsapp: false,
-      status: "draft",
-      created_at: new Date().toISOString(),
-    });
-
-  if (insertError) {
-    redirect("/quotations?error=" + enc("Failed to save quotation draft"));
-  }
-
-  if (sendViaWhatsapp) {
-    // Send via WhatsApp
-    await sendQuotation(fd);
-  } else {
-    // Just save as draft, don't send
-    refresh();
-    redirect("/quotations?saved=Quotation saved as draft. Send anytime from pending quotations.");
-  }
-}
-
 export async function sendQuotation(fd: FormData) {
   const { supabase, studio } = await requireStudio();
 
