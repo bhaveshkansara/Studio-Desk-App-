@@ -85,7 +85,6 @@ export default async function SettingsPage({
             }}
           >
             <Link
-              key="whatsapp"
               href="/settings/whatsapp"
               style={{
                 padding: "16px",
@@ -94,15 +93,9 @@ export default async function SettingsPage({
                 textDecoration: "none",
                 color: "inherit",
                 transition: "all 0.2s",
+                display: "block",
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "var(--panel-bg)";
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "transparent";
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--line)";
-              }}
+              className="integration-card"
             >
               <div style={{ fontSize: "1.3em", marginBottom: "8px" }}>💬</div>
               <strong>WhatsApp Integration</strong>
@@ -112,7 +105,6 @@ export default async function SettingsPage({
             </Link>
 
             <Link
-              key="razorpay"
               href="/settings/razorpay"
               style={{
                 padding: "16px",
@@ -121,15 +113,9 @@ export default async function SettingsPage({
                 textDecoration: "none",
                 color: "inherit",
                 transition: "all 0.2s",
+                display: "block",
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "var(--panel-bg)";
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--primary)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLElement).style.background = "transparent";
-                (e.currentTarget as HTMLElement).style.borderColor = "var(--line)";
-              }}
+              className="integration-card"
             >
               <div style={{ fontSize: "1.3em", marginBottom: "8px" }}>💳</div>
               <strong>Razorpay Payments</strong>
@@ -139,6 +125,13 @@ export default async function SettingsPage({
             </Link>
           </div>
         </div>
+
+        <style>{`
+          .integration-card:hover {
+            background: var(--panel-bg);
+            border-color: var(--primary);
+          }
+        `}</style>
       </section>
     </>
   );
